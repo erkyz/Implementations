@@ -1,11 +1,13 @@
+# An AVL tree for objects with ordering (__lt__)
+
 # AVL tree helper - no interfaces in Python?
 class AVL_help:
-    def __init__(self,val,left,right,parent):
+    def __init__(self,key,left,right,parent):
         # B.C. none for all
         self.left = left
         self.right = right
         self.parent = parent # this is a pointer, right??
-        self.data = val
+        self.key = key
         self.lheight = 0
         self.rheight = 0
 
@@ -15,10 +17,13 @@ class AVL_help:
         if self.parent.right:
             self.parent.right.parent = self.parent
         self.left = self.parent
+        if self.left.parent:
+            if self.left.parent.left.key == self.left.key:
+                self.left.parent.left = self
+            else:
+                self.left.parent.right = self
         self.parent = self.left.parent
         self.left.parent = self 
-        if self.parent:
-            self.parent.left = self
 
     def rotateRight(self):
         # REQUIRE self.parent is not None, self.parent.left == self
@@ -26,14 +31,17 @@ class AVL_help:
         if self.parent.left:
             self.parent.left.parent = self.parent
         self.right = self.parent
+        if self.right.parent:
+            if self.right.parent.left and self.right.parent.left.key == self.right.key:
+                self.right.parent.left = self
+            else:
+                self.right.parent.right = self
         self.parent = self.right.parent
         self.right.parent = self
-        if self.parent:
-            self.parent.right = self
 
     def adjustHeightUp(self,dh):
         if self.parent is not None:
-            if self.parent.left == self:
+            if self.parent.left and self.parent.left.key == self.key:
                 self.parent.lheight += dh
                 self.parent.adjustHeightUp(dh)
             else:
@@ -45,12 +53,44 @@ class AVL_help:
             return self
         else:
             return self.parent.root()
-    
+   
+    def rebalance(self):
+        # could do "pattern match" rebalancing, use "balance factor"
+        if self.lheight-self.rheight > 1:
+            if self.left.lheight > self.left.rheight:
+                self.left.rotateRight()
+                self.parent.rheight += 1
+                self.lheight -= 2
+                self.parent.adjustHeightUp(-1)
+            else:
+                self.left.right.rotateLeft()
+                self.left.rotateRight()
+                self.parent.adjustHeightUp(-1)
+                self.parent.lheight += 1
+                self.parent.rheight += 1
+                self.lheight -= 2
+                self.parent.left.rheight -= 1
+        elif self.rheight-self.lheight > 1:
+            if self.right.rheight > self.right.lheight:
+                self.right.rotateLeft()
+                self.parent.lheight += 1
+                self.rheight -= 2
+                self.parent.adjustHeightUp(-1)
+            else:
+                self.right.left.rotateRight()
+                self.right.rotateLeft()
+                self.parent.adjustHeightUp(-1)
+                self.parent.lheight += 1
+                self.parent.rheight += 1
+                self.rheight -= 2
+                self.parent.right.lheight -= 1
+
+
     def insert(self,x):
-        if x == self.data:
-            return
+        if self.key is None:
+            self.key = x
         else:
-            if x > self.data:
+            if x >= self.key:
                 if self.right is None:
                     self.right = AVL_help(x,None,None,self)
                     self.rheight += 1
@@ -65,45 +105,15 @@ class AVL_help:
                     self.left.insert(x)
                     self.lheight += 1
             
-            # invariant of abs(lheight-rheight) <= 1 may be broken
-            # could do "pattern match" rebalancing, use "balance factor"
-            if self.lheight-self.rheight > 1:
-                if self.left.lheight > self.left.rheight:
-                    print("right rotate")
-                    self.left.rotateRight()
-                    self.parent.rheight += 1
-                    self.lheight -= 2
-                    self.parent.adjustHeightUp(-1)
-                else:
-                    print("double right rotate")
-                    self.left.right.rotateLeft()
-                    self.left.rotateRight()
-                    self.parent.adjustHeightUp(-1)
-                    self.parent.lheight += 1
-                    self.parent.rheight += 1
-                    self.lheight -= 2
-                    self.parent.left.rheight -= 1
-            elif self.rheight-self.lheight > 1:
-                if self.right.rheight > self.right.lheight:
-                    print("left rotate")
-                    self.right.rotateLeft()
-                    self.parent.lheight += 1
-                    self.rheight -= 2
-                    self.parent.adjustHeightUp(-1)
-                else:
-                    print("double left rotate")
-                    self.right.left.rotateRight()
-                    self.right.rotateLeft()
-                    self.parent.adjustHeightUp(-1)
-                    self.parent.lheight += 1
-                    self.parent.rheight += 1
-                    self.rheight -= 2
-                    self.parent.right.lheight -= 1
-            
+            # invariant of abs(lheight-rheight) <= 1 may be broken here
+            self.rebalance()
+
     def find(self,x):
-        if self.data == x:
+        if self.key is None:
+            return None
+        elif self.key == x:
             return self
-        elif self.data < x:
+        elif self.key < x:
             if self.right is None:
                 return None
             else:
@@ -125,51 +135,50 @@ class AVL_help:
                 pred = pred.right
             return pred
     
-    def delete(self,x):
-        val = self.find(x)
-        if val:
-            if val.left is None and val.right is None: # is leaf
-                if val.parent:
-                    if val == val.parent.left:
-                        val.parent.left = None
+    def delete(self,key):
+        rem = self.find(key)
+        if rem:
+            if rem.left is None and rem.right is None: # is leaf
+                if rem.parent:
+                    if rem.parent.left and rem.key == rem.parent.left.key:
+                        rem.parent.left = None
                     else:
-                        val.parent.right = None
+                        rem.parent.right = None
                 else:
-                    val.data = None
-            elif val.left and val.right is None: # only left child
-                if val.parent is None:
-                    val.data = val.left.data
-                    val.left = None
-                    val.lheight = 0
-                elif val == val.parent.left:
-                    val.left.parent = val.parent
-                    val.parent.lheight -= 1
-                    val.parent.left = val.left
+                    rem.key = None
+            elif rem.left and rem.right is None: # only left child
+                if rem.parent is None:
+                    rem.key = rem.left.key
+                    rem.left = None
+                    rem.lheight = 0
+                elif rem.parent.left and rem.key == rem.parent.left.key:
+                    rem.left.parent = rem.parent
+                    rem.adjustHeightUp(-1)
+                    rem.parent.left = rem.left
                 else:
-                    val.left.parent = val.parent
-                    val.parent.rheight -= 1
-                    val.parent.right = val.left
-            elif val.right and val.left is None: # only right child
-                if val.parent is None:
-                    val.data = val.right.data
-                    val.left = None
-                    val.rheight = 0
-                elif val == val.parent.left:
-                    val.right.parent = val.parent
-                    val.parent.lheight -= 1
-                    val.parent.left = val.right
+                    rem.left.parent = rem.parent
+                    rem.adjustHeightUp(-1)
+                    rem.parent.right = rem.left
+            elif rem.right and rem.left is None: # only right child
+                if rem.parent is None:
+                    rem.key = rem.right.key
+                    rem.left = None
+                    rem.rheight = 0
+                elif rem.parent.left and rem.key == rem.parent.left.key:
+                    rem.right.parent = rem.parent
+                    rem.adjustHeightUp(-1)
+                    rem.parent.left = rem.right
                 else:
-                    val.right.parent = val.parent
-                    val.parent.rheight -= 1
-                    val.parent.right = val.right
+                    rem.right.parent = rem.parent
+                    rem.adjustHeightUp(-1)
+                    rem.parent.right = rem.right
             else: # has 2 children (is internal node)
-                pred = val._findPredecessor() # is not None
-                pred.adjustHeightUp(-1)
-                self.delete(pred.data)
-                val.data = pred.data
+                pred = rem.findPredecessor() # is not None
+                self.delete(pred.key)
+                rem.key = pred.key
 
         else:
-            print (x, "is not in this tree")
+            print (key, "is not in this tree")
 
     def __iter__(self):
         #BC: Empty
@@ -177,57 +186,98 @@ class AVL_help:
             if self.left:
                 for x in self.left:
                     yield x
-            yield self.data
+            yield self.key
             if self.right:
                 for x in self.right:
                     yield x    
 
 
 class AVL:
-    def __init__(self,val):
-        self.tree = AVL_help(val,None,None,None)
+    def __init__(self,keys):
+        self.tree = AVL_help(None,None,None,None)
+        for key in keys:
+            self.insert(key)
 
-    def insert(self,val):
-        self.tree.insert(val)
+    def insert(self,key):
+        self.tree.insert(key)
         self.tree = self.tree.root()
 
+    def find(self,key):
+        return self.tree.find(key) is not None
+
     def __contains__(self,x):
-        if self.tree.find(x):
-            return True
-        else:
-            return False
+        return self.find(x)
 
     def __delitem__(self,x):
         self.tree.delete(x)
 
-    def inorder(self):
-        for x in self.tree:
-            print (x, end=" ")
-        print()
-
     def __iter__(self):
-        #BC: Empty
-        if self.tree:
+        if self.tree.key:
             if self.tree.left:
                 for x in self.tree.left:
                     yield x
-            yield self.tree.data
+            yield self.tree.key
             if self.tree.right:
                 for x in self.tree.right:
                     yield x    
 
 
-# Tests
-test = AVL(10)
-test.insert(4)
-test.insert(20)
-test.insert(14)
-test.insert(15)
-test.insert(16)
-test.inorder()
-print("14 in test:", 14 in test)
-del test[14]
-test.inorder()
-print("14 in test:", 14 in test)
-del test[10]
-test.inorder()
+
+# Python implements dictionaries as hash tables. I'm going to use an AVL tree, obviously less efficient
+
+class AVL_dict_help(AVL_help):
+    def __init__(self,key,val,left,right,parent):
+        # B.C. none for all
+        self.left = left
+        self.right = right
+        self.parent = parent # this is a pointer, right??
+        self.key = key
+        self.val = val
+        self.lheight = 0
+        self.rheight = 0
+
+    def insert(self,key,val):
+        if self.key is None:
+            self.key = key
+            self.val = val
+        else:
+            if key >= self.key:
+                if self.right is None:
+                    self.right = AVL_dict_help(key,val,None,None,self)
+                    self.rheight = 1
+                    if self.left is None:
+                        self.adjustHeightUp(1)
+                else:
+                    self.right.insert(key,val)
+            else:
+                if self.left is None:
+                    self.left = AVL_dict_help(key,val,None,None,self)
+                    self.lheight = 1
+                    if self.right is None:
+                        self.adjustHeightUp(1)
+                else:
+                    self.left.insert(key,val)
+       
+        self.rebalance()
+
+
+class AVL_dict(AVL):
+    def __init__(self,items):
+        self.tree = AVL_dict_help(None,None,None,None,None)
+        for item in items:
+            self.insert(item,items[item])
+
+    def insert(self,key,val):
+        self.tree.insert(key,val)
+        self.tree = self.tree.root()
+
+    def __setitem__(self,key,val):
+        self.insert(key,val)
+
+    def __getitem__(self,key):
+        res = self.tree.find(key)
+        if res:
+            return res.val
+        return res
+
+    # TODO setdefault, values()
