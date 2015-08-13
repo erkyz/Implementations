@@ -222,7 +222,6 @@ class AVL:
                     yield x    
 
 
-
 # Python implements dictionaries as hash tables. I'm going to use an AVL tree, obviously less efficient
 
 class AVL_dict_help(AVL_help):
@@ -260,6 +259,16 @@ class AVL_dict_help(AVL_help):
        
         self.rebalance()
 
+    def __iter__(self):
+        if self.key:
+            if self.left:
+                for k,v in self.left:
+                    yield k,v
+            yield self.key, self.val
+            if self.right:
+                for k,v in self.right:
+                    yield k,v
+
 
 class AVL_dict(AVL):
     def __init__(self,items):
@@ -278,6 +287,15 @@ class AVL_dict(AVL):
         res = self.tree.find(key)
         if res:
             return res.val
-        return res
 
-    # TODO setdefault, values()
+    def __iter__(self):
+        if self.tree.key:
+            if self.tree.left:
+                for k,v in self.tree.left:
+                    yield k,v
+            yield self.tree.key, self.tree.val
+            if self.tree.right:
+                for k,v in self.tree.right:
+                    yield k,v  
+
+    # TODO setdefault, keys(), values()
